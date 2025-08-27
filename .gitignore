@@ -1,0 +1,22 @@
+assets/scenes
+cache
+build
+.vs
+.vscode
+.idea
+imgui.ini
+doxygen/
+tests/system_test/artifacts
+tests/system_test/tmp
+output/*
+.mypy_cache
+tags
+
+# vim backup and temp files
+*~
+.*.sw*
+.sw*
+.tracy
+
+# macOS
+.DS_Store
