@@ -1,0 +1,17 @@
+git submodule add https://github.com/zeux/volk third_party/volk
+git submodule add https://github.com/g-truc/glm third_party/glm
+git submodule add https://github.com/nothings/stb third_party/stb
+git submodule add https://github.com/ocornut/imgui third_party/imgui
+git submodule add https://github.com/syoyo/tinygltf third_party/tinygltf
+git submodule add https://github.com/glfw/glfw third_party/glfw
+git submodule add https://github.com/KhronosGroup/SPIRV-Cross third_party/spirv-cross
+git submodule add https://github.com/ARM-software/HWCPipe third_party/hwcpipe
+git submodule add https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator third_party/vma
+git submodule add https://github.com/gabime/spdlog third_party/spdlog
+git submodule add https://github.com/KhronosGroup/KTX-Software third_party/ktx
+git submodule add https://github.com/ARM-software/astc-encoder third_party/astc
+git submodule add https://github.com/KhronosGroup/Vulkan-Headers third_party/vulkan
+git submodule add https://github.com/KhronosGroup/Vulkan-Samples-Assets assets
+git submodule add https://github.com/KhronosGroup/OpenCL-Headers.git third_party/opencl
+git submodule add https://github.com/fmtlib/fmt third_party/fmt
+git submodule add https://github.com/wolfpld/tracy.git third_party/tracy
