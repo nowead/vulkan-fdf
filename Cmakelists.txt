@@ -1,0 +1,18 @@
+# vulkan_triangle/CMakeLists.txt
+
+cmake_minimum_required(VERSION 3.10)
+project(VulkanTriangleGLFW)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(Vulkan REQUIRED)
+
+include_directories(external)
+
+add_subdirectory(external/glfw)
+add_subdirectory(external/glm)
+
+add_executable(VulkanTriangleGLFW src/main.cpp)
+
+target_link_libraries(VulkanTriangleGLFW Vulkan::Vulkan glfw glm)
