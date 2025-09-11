@@ -1,18 +1,40 @@
-# vulkan_triangle/CMakeLists.txt
+cmake_minimum_required(VERSION 3.18)
 
-cmake_minimum_required(VERSION 3.10)
-project(VulkanTriangleGLFW)
+project(vulkanGLFW CXX)
 
+# C++ 표준 설정
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# --- 수정 시작 ---
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
+find_package(glfw3 CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
+find_package(Stb REQUIRED)
 
-include_directories(external)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
+find_package(Vulkan REQUIRED)
+find_package(Stb REQUIRED)
 
-add_subdirectory(external/glfw)
-add_subdirectory(external/glm)
+# --- 아래 디버깅 메시지 추가 ---
+message(STATUS "--- Vulkan Debug Info ---")
+message(STATUS "Vulkan_FOUND: ${Vulkan_FOUND}")
+message(STATUS "VULKAN_INCLUDE_DIR: ${VULKAN_INCLUDE_DIR}")
+message(STATUS "VULKAN_LIBRARY: ${VULKAN_LIBRARY}")
+message(STATUS "VULKAN_SDK (env var from CMake): $ENV{VULKAN_SDK}")
+message(STATUS "-------------------------")
+# --- 여기까지 추가 ---
 
-add_executable(VulkanTriangleGLFW src/main.cpp)
+# 실행 파일 생성
+add_executable(vulkanGLFW main.cpp)
 
-target_link_libraries(VulkanTriangleGLFW Vulkan::Vulkan glfw glm)
+target_link_libraries(vulkanGLFW PRIVATE
+    glfw
+    glm::glm
+    Vulkan::Vulkan
+    Stb::stb
+)
