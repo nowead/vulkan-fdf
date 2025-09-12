@@ -1,7 +1,7 @@
 ﻿{
   "configurations": [
     {
-      "name": "x64-Debug",
+      "name": "x64-Debug-Windows",
       "generator": "Ninja",
       "configurationType": "Debug",
       "inheritEnvironments": [ "msvc_x64_x64" ],
@@ -10,7 +10,18 @@
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "cmakeToolchain": "C:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      "cmakeToolchain": "${env.VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+    },
+    {
+      "name": "x64-Debug-macOS",
+      "generator": "Ninja", 
+      "configurationType": "Debug",
+      "buildRoot": "${projectDir}/out/build/${name}",
+      "installRoot": "${projectDir}/out/install/${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "cmakeToolchain": "${env.VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
     }
   ]
 }
