@@ -19,6 +19,24 @@
                 "VCPKG_TARGET_TRIPLET": "x64-osx"
             }
         },
+            {
+                "name": "windows-default",
+                "displayName": "Windows Default Config",
+                "description": "Default build for Windows using vcpkg",
+                "generator": "Ninja",
+                "binaryDir": "${sourceDir}/build-windows",
+                "cacheVariables": {
+                    "CMAKE_BUILD_TYPE": "Debug",
+                    "CMAKE_TOOLCHAIN_FILE": "${env.VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                    "CMAKE_EXPORT_COMPILE_COMMANDS": "TRUE",
+                    "CMAKE_C_COMPILER": "cl",
+                    "CMAKE_CXX_COMPILER": "cl",
+                    "CMAKE_CXX_FLAGS": ""
+                },
+                "environment": {
+                    "VCPKG_TARGET_TRIPLET": "x64-windows"
+                }
+            },
         {
             "name": "release",
             "displayName": "Release Config", 
@@ -43,6 +61,10 @@
             "name": "default",
             "configurePreset": "default"
         },
+            {
+                "name": "windows-default",
+                "configurePreset": "windows-default"
+            },
         {
             "name": "release", 
             "configurePreset": "release"

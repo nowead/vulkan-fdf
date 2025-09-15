@@ -69,22 +69,29 @@ private:
         uint32_t glfwExtensionCount = 0;
         auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
+        std::vector<const char *> requiredExtensions;
+        for (int i=0; i<glfwExtensionCount; i++) {
+            requiredExtensions.emplace_back(glfwExtensions[i]);
+        }
+        requiredExtensions.emplace_back(vk::KHRPortabilityEnumerationExtensionName);
+
         // Check if the required GLFW extensions are supported by the Vulkan implementation.
         auto extensionProperties = context.enumerateInstanceExtensionProperties();
-        for (uint32_t i = 0; i < glfwExtensionCount; ++i)
+        for (const auto &requiredExtension : requiredExtensions)
         {
             if (std::ranges::none_of(extensionProperties,
-                [glfwExtension = glfwExtensions[i]](auto const& extensionProperty)
-                { return strcmp(extensionProperty.extensionName, glfwExtension) == 0; }))
+                [requiredExtension](auto const& extensionProperty)
+                { return strcmp(extensionProperty.extensionName, requiredExtension) == 0; }))
             {
-                throw std::runtime_error("Required GLFW extension not supported: " + std::string(glfwExtensions[i]));
+                throw std::runtime_error("Required GLFW extension not supported: " + std::string(requiredExtension));
             }
         }
 
         vk::InstanceCreateInfo createInfo{
+            .flags = vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR,
             .pApplicationInfo = &appInfo,
-            .enabledExtensionCount = glfwExtensionCount,
-            .ppEnabledExtensionNames = glfwExtensions };
+            .enabledExtensionCount = static_cast<uint32_t>(requiredExtensions.size()),
+            .ppEnabledExtensionNames = requiredExtensions.data() };
         instance = vk::raii::Instance(context, createInfo);
     }
 };
