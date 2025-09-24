@@ -55,10 +55,10 @@ private:
 
     std::vector<const char*> requiredDeviceExtension = {
         vk::KHRSwapchainExtensionName,
-        vk::KHRSpirv14ExtensionName,
-        vk::KHRSynchronization2ExtensionName,
-        vk::KHRCreateRenderpass2ExtensionName,
-        "VK_KHR_portability_subset"
+        // vk::KHRSpirv14ExtensionName,
+        // vk::KHRSynchronization2ExtensionName,
+        // vk::KHRCreateRenderpass2ExtensionName,
+        // "VK_KHR_portability_subset"  // Mainly needed for macOS MoltenVK
     };
 
     void initWindow() {
@@ -161,7 +161,9 @@ private:
           [&]( auto const & device )
           {
             // Check if the device supports the Vulkan 1.3 API version
-            bool supportsVulkan1_3 = device.getProperties().apiVersion >= VK_API_VERSION_1_3;
+            // bool supportsVulkan1_3 = device.getProperties().apiVersion >= VK_API_VERSION_1_3;
+            // Relaxed requirement for broader compatibility
+            bool supportsVulkan1_1 = device.getProperties().apiVersion >= VK_API_VERSION_1_1;
 
             // Check if any of the queue families support graphics operations
             auto queueFamilies = device.getQueueFamilyProperties();
@@ -179,11 +181,17 @@ private:
                                                                  { return strcmp( availableDeviceExtension.extensionName, requiredDeviceExtension ) == 0; } );
                                    } );
 
-            auto features = device.template getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
-            bool supportsRequiredFeatures = features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
-                                            features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
+            // Original advanced feature checking (commented out for compatibility)
+            // auto features = device.template getFeatures2<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
+            // bool supportsRequiredFeatures = features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
+            //                                 features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
+            
+            // Simplified feature requirements for broader GPU compatibility
+            auto features = device.getFeatures();
+            bool supportsRequiredFeatures = true;
 
-            return supportsVulkan1_3 && supportsGraphics && supportsAllRequiredExtensions && supportsRequiredFeatures;
+            // return supportsVulkan1_3 && supportsGraphics && supportsAllRequiredExtensions && supportsRequiredFeatures;
+            return supportsVulkan1_1 && supportsGraphics && supportsAllRequiredExtensions && supportsRequiredFeatures;
           } );
         if ( devIter != devices.end() )
         {
@@ -206,17 +214,22 @@ private:
 
         auto graphicsIndex = static_cast<uint32_t>( std::distance( queueFamilyProperties.begin(), graphicsQueueFamilyProperty ) );
 
-        // query for Vulkan 1.3 features
-        vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
-            {},                               // vk::PhysicalDeviceFeatures2
-            {.dynamicRendering = true },      // vk::PhysicalDeviceVulkan13Features
-            {.extendedDynamicState = true }   // vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
-        };
+        // Original Vulkan 1.3 features (commented out for compatibility)
+        // vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
+        //     {},                               // vk::PhysicalDeviceFeatures2
+        //     {.dynamicRendering = true },      // vk::PhysicalDeviceVulkan13Features
+        //     {.extendedDynamicState = true }   // vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
+        // };
+        
+        // Simplified feature chain for broader compatibility
+        vk::PhysicalDeviceFeatures2 featureChain = {};
 
         // create a Device
         float                     queuePriority = 0.0f;
         vk::DeviceQueueCreateInfo deviceQueueCreateInfo{ .queueFamilyIndex = graphicsIndex, .queueCount = 1, .pQueuePriorities = &queuePriority };
-        vk::DeviceCreateInfo      deviceCreateInfo{ .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
+        vk::DeviceCreateInfo      deviceCreateInfo{ 
+                                                    // .pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),  // Original
+                                                    .pNext = &featureChain,
                                                     .queueCreateInfoCount = 1,
                                                     .pQueueCreateInfos = &deviceQueueCreateInfo,
                                                     .enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtension.size()),

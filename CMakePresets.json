@@ -2,8 +2,8 @@
     "version": 3,
     "configurePresets": [
         {
-            "name": "default",
-            "displayName": "Default Config",
+            "name": "mac-default",
+            "displayName": "Mac Default Config",
             "description": "Default build using vcpkg",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build",
@@ -19,55 +19,32 @@
                 "VCPKG_TARGET_TRIPLET": "x64-osx"
             }
         },
-            {
-                "name": "windows-default",
-                "displayName": "Windows Default Config",
-                "description": "Default build for Windows using vcpkg",
-                "generator": "Ninja",
-                "binaryDir": "${sourceDir}/build-windows",
-                "cacheVariables": {
-                    "CMAKE_BUILD_TYPE": "Debug",
-                    "CMAKE_TOOLCHAIN_FILE": "${env.VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-                    "CMAKE_EXPORT_COMPILE_COMMANDS": "TRUE",
-                    "CMAKE_C_COMPILER": "cl",
-                    "CMAKE_CXX_COMPILER": "cl",
-                    "CMAKE_CXX_FLAGS": ""
-                },
-                "environment": {
-                    "VCPKG_TARGET_TRIPLET": "x64-windows"
-                }
-            },
-        {
-            "name": "release",
-            "displayName": "Release Config", 
-            "description": "Release build using vcpkg",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build-release",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_TOOLCHAIN_FILE": "/Users/mindaewon/vcpkg/scripts/buildsystems/vcpkg.cmake",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "TRUE",
-                "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
-                "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++",
-                "CMAKE_CXX_FLAGS": "-stdlib=libc++ -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk"
-            },
-            "environment": {
-                "VCPKG_TARGET_TRIPLET": "x64-osx"
-            }
+      {
+        "name": "windows-default",
+        "displayName": "Windows Default Config with Clang",
+        "description": "Default build for Windows using vcpkg with Clang compiler",
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build-windows",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug",
+          "CMAKE_TOOLCHAIN_FILE": "C:\\dev\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "TRUE",
+          "CMAKE_C_COMPILER": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/bin/clang.exe",
+          "CMAKE_CXX_COMPILER": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/bin/clang++.exe"
+        },
+        "environment": {
+          "VCPKG_TARGET_TRIPLET": "x64-windows"
         }
+      }
     ],
     "buildPresets": [
         {
-            "name": "default",
-            "configurePreset": "default"
+            "name": "mac-default",
+            "configurePreset": "mac-default"
         },
-            {
-                "name": "windows-default",
-                "configurePreset": "windows-default"
-            },
         {
-            "name": "release", 
-            "configurePreset": "release"
+            "name": "windows-default",
+            "configurePreset": "windows-default"
         }
     ]
 }
