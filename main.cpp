@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <memory>
 #include <algorithm>
+#include <vector>
 
 #ifdef __INTELLISENSE__
 #include <vulkan/vulkan_raii.hpp>
