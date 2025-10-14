@@ -1,3 +1,4 @@
+#include <fstream>
 #include <assert.h>
 #include <algorithm>
 #include <iostream>
@@ -80,6 +81,8 @@ private:
         pickPhysicalDevice();
         createLogicalDevice();
         createSwapChain();
+        createImageViews();
+        createGraphicsPipeline();
     }
 
     void mainLoop() {
@@ -200,8 +203,13 @@ private:
             //                                 features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
             
             // Simplified feature requirements for broader GPU compatibility
-            auto features = device.getFeatures();
-            bool supportsRequiredFeatures = true;
+            auto features = device.template getFeatures2<vk::PhysicalDeviceFeatures2,
+                                                         vk::PhysicalDeviceVulkan11Features,
+                                                         vk::PhysicalDeviceVulkan13Features,
+                                                         vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
+            bool supportsRequiredFeatures = features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
+                                            features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
+                                            features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
 
             // return supportsVulkan1_3 && supportsGraphics && supportsAllRequiredExtensions && supportsRequiredFeatures;
             return supportsVulkan1_1 && supportsGraphics && supportsAllRequiredExtensions && supportsRequiredFeatures;
@@ -237,8 +245,13 @@ private:
         }
         
         // query for Vulkan 1.3 features
-        vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
+        vk::StructureChain<vk::PhysicalDeviceFeatures2,
+                           vk::PhysicalDeviceVulkan11Features,
+                           vk::PhysicalDeviceVulkan13Features,
+                           vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>
+          featureChain = {
             {},                               // vk::PhysicalDeviceFeatures2
+            {.shaderDrawParameters = true },  // vk::PhysicalDeviceVulkan11Features
             {.dynamicRendering = true },      // vk::PhysicalDeviceVulkan13Features
             {.extendedDynamicState = true }   // vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
         };
@@ -275,6 +288,35 @@ private:
 
         swapChain = vk::raii::SwapchainKHR( device, swapChainCreateInfo );
         swapChainImages = swapChain.getImages();
+    }
+
+    void createImageViews() {
+        assert(swapChainImageViews.empty());
+
+        vk::ImageViewCreateInfo imageViewCreateInfo{
+            .viewType = vk::ImageViewType::e2D,
+            .format = swapChainSurfaceFormat.format,
+            .subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 } };
+        for ( auto image : swapChainImages )
+        {
+            imageViewCreateInfo.image = image;
+            swapChainImageViews.emplace_back( device, imageViewCreateInfo );
+        }
+    }
+
+    void createGraphicsPipeline() {
+        vk::raii::ShaderModule shaderModule = createShaderModule(readFile("shaders/slang.spv"));
+
+        vk::PipelineShaderStageCreateInfo vertShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule,  .pName = "vertMain" };
+        vk::PipelineShaderStageCreateInfo fragShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain" };
+        vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+    }
+
+    [[nodiscard]] vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const {
+        vk::ShaderModuleCreateInfo createInfo{ .codeSize = code.size() * sizeof(char), .pCode = reinterpret_cast<const uint32_t*>(code.data()) };
+        vk::raii::ShaderModule shaderModule{ device, createInfo };
+
+        return shaderModule;
     }
 
     static uint32_t chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const & surfaceCapabilities) {
@@ -332,7 +374,17 @@ private:
         return vk::False;
     }
 
-
+    static std::vector<char> readFile(const std::string& filename) {
+        std::ifstream file(filename, std::ios::ate | std::ios::binary);
+        if (!file.is_open()) {
+            throw std::runtime_error("failed to open file!");
+        }
+        std::vector<char> buffer(file.tellg());
+        file.seekg(0, std::ios::beg);
+        file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+        file.close();
+        return buffer;
+    }
 };
 
 int main() {

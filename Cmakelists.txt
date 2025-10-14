@@ -59,3 +59,44 @@ target_sources(VulkanCppModule
         FILES
         "${Vulkan_INCLUDE_DIR}/vulkan/vulkan.cppm"
 )
+
+find_program(SLANGC_EXECUTABLE slangc HINTS $ENV{VULKAN_SDK}/bin REQUIRED)
+set(SHADER_SLANG_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shader.slang)
+
+# Slang 셰이더를 컴파일하는 CMake 함수 정의
+function (add_slang_shader_target TARGET)
+  # 함수에 전달된 인자들을 파싱합니다. (SOURCES 키워드 뒤의 값들을 가져옴)
+  cmake_parse_arguments ("SHADER" "" "" "SOURCES" ${ARGN})
+
+  # 셰이더 파일이 있는 디렉토리 경로 설정
+  set (SHADERS_DIR ${CMAKE_CURRENT_LIST_DIR}/shaders)
+  # 컴파일할 셰이더의 진입점(entry points) 설정
+  set (ENTRY_POINTS -entry vertMain -entry fragMain)
+
+  # 1. 셰이더 디렉토리가 없으면 생성하는 커스텀 명령어 추가
+  add_custom_command (
+          OUTPUT ${SHADERS_DIR}
+          COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADERS_DIR}
+  )
+
+  # 2. 실제 셰이더를 컴파일하는 커스텀 명령어 추가
+  add_custom_command (
+          OUTPUT  ${SHADERS_DIR}/slang.spv # 최종 결과물
+          # Slang 컴파일러 실행 명령어
+          COMMAND ${SLANGC_EXECUTABLE} ${SHADER_SOURCES} -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRY_POINTS} -o slang.spv
+          WORKING_DIRECTORY ${SHADERS_DIR} # 이 명령어를 실행할 디렉토리
+          DEPENDS ${SHADERS_DIR} ${SHADER_SOURCES} # 소스 파일이 변경되면 이 명령어를 다시 실행
+          COMMENT "Slang 셰이더 컴파일 중..."
+          VERBATIM
+  )
+
+  # 3. 위 커스텀 명령어들을 실행하는 커스텀 타겟 생성
+  add_custom_target (${TARGET} DEPENDS ${SHADERS_DIR}/slang.spv)
+endfunction()
+
+# 위에서 정의한 함수를 호출하여 'foo'라는 이름의 셰이더 컴파일 타겟 생성
+add_slang_shader_target(foo SOURCES ${SHADER_SLANG_SOURCES})
+
+# 실제 프로그램 실행 파일 타겟인 'bar'가 'foo' 타겟에 의존하도록 설정
+# 이렇게 하면 'bar'를 빌드하기 전에 항상 셰이더('foo')가 먼저 컴파일됩니다.
+add_dependencies(vulkanGLFW foo)
