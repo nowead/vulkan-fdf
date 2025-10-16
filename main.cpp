@@ -43,25 +43,30 @@ public:
     }
 
 private:
-    GLFWwindow *                     window = nullptr;
-    vk::raii::Context                context;
-    vk::raii::Instance               instance       = nullptr;
-    vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
-    vk::raii::SurfaceKHR             surface        = nullptr;
-    vk::raii::PhysicalDevice         physicalDevice = nullptr;
-    vk::raii::Device                 device         = nullptr;
-    uint32_t                         queueIndex     = ~0;
-    vk::raii::Queue                  queue          = nullptr;
-    vk::raii::SwapchainKHR           swapChain      = nullptr;
-    std::vector<vk::Image>           swapChainImages;
-    vk::SurfaceFormatKHR             swapChainSurfaceFormat;
-    vk::Extent2D                     swapChainExtent;
-    std::vector<vk::raii::ImageView> swapChainImageViews;
+    GLFWwindow *                        window          = nullptr;
+    vk::raii::Context                   context;
+    vk::raii::Instance                  instance        = nullptr;
+    vk::raii::DebugUtilsMessengerEXT    debugMessenger  = nullptr;
+    vk::raii::SurfaceKHR                surface         = nullptr;
+    vk::raii::PhysicalDevice            physicalDevice  = nullptr;
+    vk::raii::Device                    device          = nullptr;
+    uint32_t                            queueIndex      = ~0;
+    vk::raii::Queue                     queue           = nullptr;
+    vk::raii::SwapchainKHR              swapChain       = nullptr;
+    std::vector<vk::Image>              swapChainImages;
+    vk::SurfaceFormatKHR                swapChainSurfaceFormat;
+    vk::Extent2D                        swapChainExtent;
+    std::vector<vk::raii::ImageView>    swapChainImageViews;
     
-    vk::raii::PipelineLayout         pipelineLayout     = nullptr;
-    vk::raii::Pipeline               graphicsPipeline   = nullptr;
-    vk::raii::CommandPool            commandPool        = nullptr;
-    vk::raii::CommandBuffer          commandBuffer      = nullptr;
+    vk::raii::PipelineLayout            pipelineLayout      = nullptr;
+    vk::raii::Pipeline                  graphicsPipeline    = nullptr;
+
+    vk::raii::CommandPool               commandPool         = nullptr;
+    vk::raii::CommandBuffer             commandBuffer       = nullptr;
+
+    vk::raii::Semaphore                 presentCompleteSemaphore    = nullptr;
+    vk::raii::Semaphore                 renderFinishedSemaphore     = nullptr;
+    vk::raii::Fence                     drawFence           		= nullptr;
 
     std::vector<const char*> requiredDeviceExtension = {
         vk::KHRSwapchainExtensionName,
@@ -91,12 +96,15 @@ private:
         createGraphicsPipeline();
         createCommandPool();
         createCommandBuffer();
+		createSyncObjects();
     }
 
     void mainLoop() {
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
+			drawFrame();
         }
+		device.waitIdle();
     }
 
     void cleanup() {
@@ -446,6 +454,38 @@ private:
             .pImageMemoryBarriers = &barrier
         };
         commandBuffer.pipelineBarrier2(dependency_info);
+    }
+
+    void createSyncObjects() {
+        presentCompleteSemaphore =vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
+        renderFinishedSemaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
+        drawFence = vk::raii::Fence(device, {.flags = vk::FenceCreateFlagBits::eSignaled});
+    }
+
+    void drawFrame() {
+        queue.waitIdle();
+
+        auto [result, imageIndex] = swapChain.acquireNextImage( UINT64_MAX, *presentCompleteSemaphore, nullptr );
+        recordCommandBuffer(imageIndex);
+
+        device.resetFences(  *drawFence );
+        vk::PipelineStageFlags waitDestinationStageMask( vk::PipelineStageFlagBits::eColorAttachmentOutput );
+        const vk::SubmitInfo submitInfo{ .waitSemaphoreCount = 1, .pWaitSemaphores = &*presentCompleteSemaphore,
+                            .pWaitDstStageMask = &waitDestinationStageMask, .commandBufferCount = 1, .pCommandBuffers = &*commandBuffer,
+                            .signalSemaphoreCount = 1, .pSignalSemaphores = &*renderFinishedSemaphore };
+        queue.submit(submitInfo, *drawFence);
+        while ( vk::Result::eTimeout == device.waitForFences( *drawFence, vk::True, UINT64_MAX ) )
+            ;
+
+        const vk::PresentInfoKHR presentInfoKHR{ .waitSemaphoreCount = 1, .pWaitSemaphores = &*renderFinishedSemaphore,
+                                                .swapchainCount = 1, .pSwapchains = &*swapChain, .pImageIndices = &imageIndex };
+        result = queue.presentKHR( presentInfoKHR );
+        switch ( result )
+        {
+            case vk::Result::eSuccess: break;
+            case vk::Result::eSuboptimalKHR: std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n"; break;
+            default: break;  // an unexpected result is returned!
+        }
     }
 
     [[nodiscard]] vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const {
