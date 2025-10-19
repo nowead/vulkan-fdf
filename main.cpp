@@ -72,6 +72,9 @@ private:
 	uint32_t semaphoreIndex = 0;
 	uint32_t currentFrame = 0;
 
+	bool framebufferResized = false;
+
+
 	std::vector<const char*> requiredDeviceExtension = {
 		vk::KHRSwapchainExtensionName,
 		vk::KHRSpirv14ExtensionName,
@@ -87,7 +90,14 @@ private:
 		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
 		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+		glfwSetWindowUserPointer(window, this);
+        glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 	}
+
+	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+        app->framebufferResized = true;
+    }
 
 	void initVulkan() {
 		createInstance();
@@ -111,11 +121,31 @@ private:
 		device.waitIdle();
 	}
 
+	void cleanupSwapChain() {
+        swapChainImageViews.clear();
+        swapChain = nullptr;
+    }
+
 	void cleanup() {
 		glfwDestroyWindow(window);
 
 		glfwTerminate();
 	}
+
+	void recreateSwapChain() {
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+        while (width == 0 || height == 0) {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+
+        device.waitIdle();
+
+        cleanupSwapChain();
+        createSwapChain();
+        createImageViews();
+    }
 
 	void createInstance() {
 		constexpr vk::ApplicationInfo appInfo{
@@ -228,8 +258,9 @@ private:
 														 vk::PhysicalDeviceVulkan13Features,
 														 vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>();
 			bool supportsRequiredFeatures = features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
-											features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
-											features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
+                                            features.template get<vk::PhysicalDeviceVulkan13Features>().synchronization2 &&
+                                            features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
+                                            features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
 
 			// return supportsVulkan1_3 && supportsGraphics && supportsAllRequiredExtensions && supportsRequiredFeatures;
 			return supportsVulkan1_1 && supportsGraphics && supportsAllRequiredExtensions && supportsRequiredFeatures;
@@ -269,10 +300,10 @@ private:
 						   vk::PhysicalDeviceVulkan13Features,
 						   vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>
 		  featureChain = {
-			{},                               // vk::PhysicalDeviceFeatures2
-			{.shaderDrawParameters = true },  // vk::PhysicalDeviceVulkan11Features
-			{.dynamicRendering = true },      // vk::PhysicalDeviceVulkan13Features
-			{.extendedDynamicState = true }   // vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
+            {},                                                     // vk::PhysicalDeviceFeatures2
+            {.shaderDrawParameters = true },                        // vk::PhysicalDeviceVulkan11Features
+            {.synchronization2 = true, .dynamicRendering = true },  // vk::PhysicalDeviceVulkan13Features
+            {.extendedDynamicState = true }                         // vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
 		};
 
 		// create a Device
@@ -480,6 +511,14 @@ private:
 			;
 		auto [result, imageIndex] = swapChain.acquireNextImage( UINT64_MAX, *presentCompleteSemaphore[semaphoreIndex], nullptr );
 
+		if (result == vk::Result::eErrorOutOfDateKHR) {
+            recreateSwapChain();
+            return;
+        }
+        if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+            throw std::runtime_error("failed to acquire swap chain image!");
+        }
+
 		device.resetFences(  *inFlightFences[currentFrame] );
 		commandBuffers[currentFrame].reset();
 		recordCommandBuffer(imageIndex);
@@ -494,12 +533,12 @@ private:
 		const vk::PresentInfoKHR presentInfoKHR{ .waitSemaphoreCount = 1, .pWaitSemaphores = &*renderFinishedSemaphore[imageIndex],
 												.swapchainCount = 1, .pSwapchains = &*swapChain, .pImageIndices = &imageIndex };
 		result = queue.presentKHR( presentInfoKHR );
-		switch ( result )
-		{
-			case vk::Result::eSuccess: break;
-			case vk::Result::eSuboptimalKHR: std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n"; break;
-			default: break;  // an unexpected result is returned!
-		}
+		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || framebufferResized) {
+            framebufferResized = false;
+            recreateSwapChain();
+        } else if (result != vk::Result::eSuccess) {
+            throw std::runtime_error("failed to present swap chain image!");
+        }
 		semaphoreIndex = (semaphoreIndex + 1) % presentCompleteSemaphore.size();
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
