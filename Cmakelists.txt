@@ -12,6 +12,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(Stb REQUIRED)
+find_package(tinyobjloader REQUIRED)
 
 message(STATUS "--- Vulkan Debug Info ---")
 message(STATUS "Vulkan_FOUND: ${Vulkan_FOUND}")
@@ -28,6 +29,7 @@ target_link_libraries(vulkanGLFW PRIVATE
     Vulkan::Vulkan
     Stb::stb
     Vulkan::cppm
+    tinyobjloader::tinyobjloader
 )
 
 find_package (Vulkan REQUIRED)
