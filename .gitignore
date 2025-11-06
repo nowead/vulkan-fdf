@@ -19,6 +19,8 @@ bld/
 [Oo]bj/
 build*
 
+docs/*
+
 # CMake
 CMakeCache.txt
 CMakeFiles/
