@@ -23,6 +23,9 @@ message(STATUS "-------------------------")
 
 add_executable(vulkanGLFW
     main.cpp
+    # Core classes
+    src/core/VulkanDevice.cpp
+    src/core/VulkanDevice.hpp
     # Utility headers (header-only)
     src/utils/VulkanCommon.hpp
     src/utils/Vertex.hpp
