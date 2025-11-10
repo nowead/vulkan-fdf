@@ -21,7 +21,18 @@ message(STATUS "VULKAN_LIBRARY: ${VULKAN_LIBRARY}")
 message(STATUS "VULKAN_SDK (env var from CMake): $ENV{VULKAN_SDK}")
 message(STATUS "-------------------------")
 
-add_executable(vulkanGLFW main.cpp)
+add_executable(vulkanGLFW
+    main.cpp
+    # Utility headers (header-only)
+    src/utils/VulkanCommon.hpp
+    src/utils/Vertex.hpp
+    src/utils/FileUtils.hpp
+)
+
+# Add include directories for the project
+target_include_directories(vulkanGLFW PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
 target_link_libraries(vulkanGLFW PRIVATE
     glfw

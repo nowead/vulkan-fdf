@@ -1,4 +1,4 @@
-#include <fstream>
+// Standard library headers
 #include <assert.h>
 #include <algorithm>
 #include <iostream>
@@ -6,27 +6,18 @@
 #include <cstring>
 #include <cstdlib>
 #include <memory>
-#include <algorithm>
 #include <vector>
 
-#if defined(__INTELLISENSE__) || !defined(USE_CPP20_MODULES)
-#include <vulkan/vulkan_raii.hpp>
-#else
-import vulkan_hpp;
-#endif
+// Project utility headers
+#include "src/utils/VulkanCommon.hpp"
+#include "src/utils/Vertex.hpp"
+#include "src/utils/FileUtils.hpp"
 
-#include <vulkan/vk_platform.h>
-
+// GLFW
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/hash.hpp>
-
+// Third-party library implementations (only once)
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -49,41 +40,6 @@ constexpr bool enableValidationLayers = false;
 #else
 constexpr bool enableValidationLayers = true;
 #endif
-
-struct Vertex {
-	glm::vec3 pos;
-	glm::vec3 color;
-	glm::vec2 texCoord;
-
-	static vk::VertexInputBindingDescription getBindingDescription() {
-		return { 0, sizeof(Vertex), vk::VertexInputRate::eVertex };
-	}
-
-	static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions() {
-		return {
-			vk::VertexInputAttributeDescription( 0, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, pos) ),
-			vk::VertexInputAttributeDescription( 1, 0, vk::Format::eR32G32B32Sfloat, offsetof(Vertex, color) ),
-			vk::VertexInputAttributeDescription( 2, 0, vk::Format::eR32G32Sfloat, offsetof(Vertex, texCoord) )
-		};
-	}
-
-	bool operator==(const Vertex& other) const {
-		return pos == other.pos && color == other.color && texCoord == other.texCoord;
-	}
-};
-
-template<> struct std::hash<Vertex> {
-	size_t operator()(Vertex const& vertex) const noexcept {
-		return ((hash<glm::vec3>()(vertex.pos) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
-	}
-};
-
-struct UniformBufferObject {
-	alignas(16) glm::mat4 model;
-	alignas(16) glm::mat4 view;
-	alignas(16) glm::mat4 proj;
-};
-
 
 class HelloTriangleApplication {
 public:
@@ -451,7 +407,7 @@ private:
 	}
 
 	void createGraphicsPipeline() {
-		vk::raii::ShaderModule shaderModule = createShaderModule(readFile("shaders/slang.spv"));
+		vk::raii::ShaderModule shaderModule = createShaderModule(FileUtils::readFile("shaders/slang.spv"));
 
 		vk::PipelineShaderStageCreateInfo vertShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eVertex, .module = shaderModule,  .pName = "vertMain" };
 		vk::PipelineShaderStageCreateInfo fragShaderStageInfo{ .stage = vk::ShaderStageFlagBits::eFragment, .module = shaderModule, .pName = "fragMain" };
@@ -1135,17 +1091,6 @@ private:
 		return vk::False;
 	}
 
-	static std::vector<char> readFile(const std::string& filename) {
-		std::ifstream file(filename, std::ios::ate | std::ios::binary);
-		if (!file.is_open()) {
-			throw std::runtime_error("failed to open file!");
-		}
-		std::vector<char> buffer(file.tellg());
-		file.seekg(0, std::ios::beg);
-		file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-		file.close();
-		return buffer;
-	}
 };
 
 int main() {
