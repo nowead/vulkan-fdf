@@ -26,6 +26,11 @@ add_executable(vulkanGLFW
     # Core classes
     src/core/VulkanDevice.cpp
     src/core/VulkanDevice.hpp
+    # Resource classes
+    src/resources/VulkanBuffer.cpp
+    src/resources/VulkanBuffer.hpp
+    src/resources/VulkanImage.cpp
+    src/resources/VulkanImage.hpp
     # Utility headers (header-only)
     src/utils/VulkanCommon.hpp
     src/utils/Vertex.hpp
