@@ -13,10 +13,11 @@ public:
 
     ~VulkanBuffer() = default; // RAII handles cleanup automatically
 
-    // Disable copy, enable move
+    // Disable copy, enable move construction only
     VulkanBuffer(const VulkanBuffer&) = delete;
     VulkanBuffer& operator=(const VulkanBuffer&) = delete;
     VulkanBuffer(VulkanBuffer&&) = default;
+    VulkanBuffer& operator=(VulkanBuffer&&) = delete;  // Move assignment not supported due to reference member
 
     // Data operations
     void map();

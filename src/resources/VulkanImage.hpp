@@ -19,10 +19,11 @@ public:
 
     ~VulkanImage() = default; // RAII handles cleanup
 
-    // Disable copy, enable move
+    // Disable copy, enable move construction only
     VulkanImage(const VulkanImage&) = delete;
     VulkanImage& operator=(const VulkanImage&) = delete;
     VulkanImage(VulkanImage&&) = default;
+    VulkanImage& operator=(VulkanImage&&) = delete;  // Move assignment not supported due to reference member
 
     // Layout transitions
     void transitionLayout(
