@@ -5,6 +5,10 @@
 *.suo
 *.userosscache
 *.sln.docstates
+.vs*
+
+#claude code
+.claude
 
 # Build results
 [Dd]ebug/
