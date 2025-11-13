@@ -32,6 +32,8 @@ add_executable(vulkanGLFW
     src/resources/VulkanImage.cpp
     src/resources/VulkanImage.hpp
     # Rendering classes
+    src/rendering/Renderer.cpp
+    src/rendering/Renderer.hpp
     src/rendering/SyncManager.cpp
     src/rendering/SyncManager.hpp
     src/rendering/CommandManager.cpp
