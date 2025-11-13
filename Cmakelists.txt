@@ -23,6 +23,9 @@ message(STATUS "-------------------------")
 
 add_executable(vulkanGLFW
     src/main.cpp
+    # Application layer
+    src/Application.cpp
+    src/Application.hpp
     # Core classes
     src/core/VulkanDevice.cpp
     src/core/VulkanDevice.hpp
