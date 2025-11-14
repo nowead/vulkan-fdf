@@ -19,12 +19,14 @@ public:
      * @param swapchain Swapchain for format information
      * @param shaderPath Path to compiled shader SPIR-V file
      * @param depthFormat Depth buffer format
+     * @param renderPass Render pass (Linux only, ignored on other platforms)
      */
     VulkanPipeline(
         VulkanDevice& device,
         const VulkanSwapchain& swapchain,
         const std::string& shaderPath,
-        vk::Format depthFormat);
+        vk::Format depthFormat,
+        vk::RenderPass renderPass = nullptr);
 
     ~VulkanPipeline() = default;
 
@@ -54,7 +56,8 @@ private:
     void createGraphicsPipeline(
         const std::string& shaderPath,
         vk::Format colorFormat,
-        vk::Format depthFormat);
+        vk::Format depthFormat,
+        vk::RenderPass renderPass);
 
     vk::raii::ShaderModule createShaderModule(const std::vector<char>& code);
 };

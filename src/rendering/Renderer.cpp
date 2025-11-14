@@ -19,16 +19,27 @@ Renderer::Renderer(GLFWwindow* window,
     // Create swapchain
     swapchain = std::make_unique<VulkanSwapchain>(*device, window);
 
-    // Create pipeline
+    // Create depth resources
+    createDepthResources();
+
+#ifdef __linux__
+    // Linux: Create render pass and framebuffers for traditional rendering
+    swapchain->createRenderPass(findDepthFormat());
+    std::vector<vk::ImageView> depthViews(swapchain->getImageCount(), depthImage->getImageView());
+    swapchain->createFramebuffers(depthViews);
+
+    // Create pipeline with render pass
+    pipeline = std::make_unique<VulkanPipeline>(
+        *device, *swapchain, "shaders/slang.spv", findDepthFormat(), swapchain->getRenderPass());
+#else
+    // macOS/Windows: Create pipeline with dynamic rendering
     pipeline = std::make_unique<VulkanPipeline>(
         *device, *swapchain, "shaders/slang.spv", findDepthFormat());
+#endif
 
     // Create command manager
     commandManager = std::make_unique<CommandManager>(
         *device, device->getGraphicsQueueFamily(), MAX_FRAMES_IN_FLIGHT);
-
-    // Create depth resources
-    createDepthResources();
 
     // Create uniform buffers
     createUniformBuffers();
@@ -253,6 +264,49 @@ void Renderer::updateDescriptorSets() {
 void Renderer::recordCommandBuffer(uint32_t imageIndex) {
     commandManager->getCommandBuffer(currentFrame).begin({});
 
+    // Clear values
+    std::array<vk::ClearValue, 2> clearValues = {
+        vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f),
+        vk::ClearDepthStencilValue(1.0f, 0)
+    };
+
+#ifdef __linux__
+    // Linux: Use traditional render pass
+    vk::RenderPassBeginInfo renderPassInfo{
+        .renderPass = swapchain->getRenderPass(),
+        .framebuffer = swapchain->getFramebuffer(imageIndex),
+        .renderArea = {
+            .offset = {0, 0},
+            .extent = swapchain->getExtent()
+        },
+        .clearValueCount = static_cast<uint32_t>(clearValues.size()),
+        .pClearValues = clearValues.data()
+    };
+
+    commandManager->getCommandBuffer(currentFrame).beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
+
+    // Bind pipeline and draw
+    pipeline->bind(commandManager->getCommandBuffer(currentFrame));
+    commandManager->getCommandBuffer(currentFrame).setViewport(
+        0, vk::Viewport(0.0f, 0.0f,
+                       static_cast<float>(swapchain->getExtent().width),
+                       static_cast<float>(swapchain->getExtent().height),
+                       0.0f, 1.0f));
+    commandManager->getCommandBuffer(currentFrame).setScissor(
+        0, vk::Rect2D(vk::Offset2D(0, 0), swapchain->getExtent()));
+
+    if (mesh && mesh->hasData()) {
+        mesh->bind(commandManager->getCommandBuffer(currentFrame));
+        commandManager->getCommandBuffer(currentFrame).bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics,
+            pipeline->getPipelineLayout(),
+            0, *descriptorSets[currentFrame], nullptr);
+        mesh->draw(commandManager->getCommandBuffer(currentFrame));
+    }
+
+    commandManager->getCommandBuffer(currentFrame).endRenderPass();
+#else
+    // macOS/Windows: Use dynamic rendering (Vulkan 1.3)
     // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL
     transitionImageLayout(
         imageIndex,
@@ -290,15 +344,12 @@ void Renderer::recordCommandBuffer(uint32_t imageIndex) {
     commandManager->getCommandBuffer(currentFrame).pipelineBarrier2(depthDependencyInfo);
 
     // Setup rendering attachments
-    vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
-    vk::ClearValue clearDepth = vk::ClearDepthStencilValue(1.0f, 0);
-
     vk::RenderingAttachmentInfo colorAttachmentInfo = {
         .imageView = swapchain->getImageView(imageIndex),
         .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
         .loadOp = vk::AttachmentLoadOp::eClear,
         .storeOp = vk::AttachmentStoreOp::eStore,
-        .clearValue = clearColor
+        .clearValue = clearValues[0]
     };
 
     vk::RenderingAttachmentInfo depthAttachmentInfo = {
@@ -306,7 +357,7 @@ void Renderer::recordCommandBuffer(uint32_t imageIndex) {
         .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
         .loadOp = vk::AttachmentLoadOp::eClear,
         .storeOp = vk::AttachmentStoreOp::eDontCare,
-        .clearValue = clearDepth
+        .clearValue = clearValues[1]
     };
 
     vk::RenderingInfo renderingInfo = {
@@ -350,6 +401,7 @@ void Renderer::recordCommandBuffer(uint32_t imageIndex) {
         vk::PipelineStageFlagBits2::eColorAttachmentOutput,
         vk::PipelineStageFlagBits2::eBottomOfPipe
     );
+#endif
 
     commandManager->getCommandBuffer(currentFrame).end();
 }

@@ -6,12 +6,13 @@ VulkanPipeline::VulkanPipeline(
     VulkanDevice& device,
     const VulkanSwapchain& swapchain,
     const std::string& shaderPath,
-    vk::Format depthFormat)
+    vk::Format depthFormat,
+    vk::RenderPass renderPass)
     : device(device) {
-    
+
     createDescriptorSetLayout();
     createPipelineLayout();
-    createGraphicsPipeline(shaderPath, swapchain.getFormat(), depthFormat);
+    createGraphicsPipeline(shaderPath, swapchain.getFormat(), depthFormat, renderPass);
 }
 
 void VulkanPipeline::createDescriptorSetLayout() {
@@ -51,7 +52,8 @@ void VulkanPipeline::createPipelineLayout() {
 void VulkanPipeline::createGraphicsPipeline(
     const std::string& shaderPath,
     vk::Format colorFormat,
-    vk::Format depthFormat) {
+    vk::Format depthFormat,
+    vk::RenderPass renderPass) {
     
     vk::raii::ShaderModule shaderModule = createShaderModule(FileUtils::readFile(shaderPath));
 
@@ -144,7 +146,32 @@ void VulkanPipeline::createGraphicsPipeline(
         .pDynamicStates = dynamicStates.data()
     };
 
-    // Pipeline creation with dynamic rendering
+    // Platform-specific pipeline creation
+#ifdef __linux__
+    // Linux: Use traditional render pass (Vulkan 1.1)
+    vk::GraphicsPipelineCreateInfo pipelineInfo{
+        .stageCount = 2,
+        .pStages = shaderStages,
+        .pVertexInputState = &vertexInputInfo,
+        .pInputAssemblyState = &inputAssembly,
+        .pViewportState = &viewportState,
+        .pRasterizationState = &rasterizer,
+        .pMultisampleState = &multisampling,
+        .pDepthStencilState = &depthStencil,
+        .pColorBlendState = &colorBlending,
+        .pDynamicState = &dynamicState,
+        .layout = *pipelineLayout,
+        .renderPass = renderPass,
+        .subpass = 0
+    };
+
+    graphicsPipeline = vk::raii::Pipeline(
+        device.getDevice(),
+        nullptr,
+        pipelineInfo
+    );
+#else
+    // macOS/Windows: Use dynamic rendering (Vulkan 1.3)
     vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipelineCreateInfoChain = {
         {
             .stageCount = 2,
@@ -168,10 +195,11 @@ void VulkanPipeline::createGraphicsPipeline(
     };
 
     graphicsPipeline = vk::raii::Pipeline(
-        device.getDevice(), 
-        nullptr, 
+        device.getDevice(),
+        nullptr,
         pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>()
     );
+#endif
 }
 
 vk::raii::ShaderModule VulkanPipeline::createShaderModule(const std::vector<char>& code) {

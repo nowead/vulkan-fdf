@@ -49,6 +49,10 @@ void VulkanSwapchain::createImageViews() {
 }
 
 void VulkanSwapchain::cleanup() {
+#ifdef __linux__
+    framebuffers.clear();
+    renderPass = nullptr;
+#endif
     imageViews.clear();
     swapchain = nullptr;
 }
@@ -105,7 +109,7 @@ vk::Extent2D VulkanSwapchain::chooseExtent(const vk::SurfaceCapabilitiesKHR& cap
     if (capabilities.currentExtent.width != 0xFFFFFFFF) {
         return capabilities.currentExtent;
     }
-    
+
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
 
@@ -114,3 +118,94 @@ vk::Extent2D VulkanSwapchain::chooseExtent(const vk::SurfaceCapabilitiesKHR& cap
         std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
     };
 }
+
+#ifdef __linux__
+void VulkanSwapchain::createRenderPass(vk::Format depthFormat) {
+    // Color attachment
+    vk::AttachmentDescription colorAttachment{
+        .format = surfaceFormat.format,
+        .samples = vk::SampleCountFlagBits::e1,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eStore,
+        .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+        .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+        .initialLayout = vk::ImageLayout::eUndefined,
+        .finalLayout = vk::ImageLayout::ePresentSrcKHR
+    };
+
+    vk::AttachmentReference colorAttachmentRef{
+        .attachment = 0,
+        .layout = vk::ImageLayout::eColorAttachmentOptimal
+    };
+
+    // Depth attachment
+    vk::AttachmentDescription depthAttachment{
+        .format = depthFormat,
+        .samples = vk::SampleCountFlagBits::e1,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eDontCare,
+        .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+        .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+        .initialLayout = vk::ImageLayout::eUndefined,
+        .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal
+    };
+
+    vk::AttachmentReference depthAttachmentRef{
+        .attachment = 1,
+        .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal
+    };
+
+    // Subpass
+    vk::SubpassDescription subpass{
+        .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &colorAttachmentRef,
+        .pDepthStencilAttachment = &depthAttachmentRef
+    };
+
+    // Subpass dependency
+    vk::SubpassDependency dependency{
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+        .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+        .srcAccessMask = {},
+        .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite
+    };
+
+    std::array attachments = { colorAttachment, depthAttachment };
+    vk::RenderPassCreateInfo renderPassInfo{
+        .attachmentCount = static_cast<uint32_t>(attachments.size()),
+        .pAttachments = attachments.data(),
+        .subpassCount = 1,
+        .pSubpasses = &subpass,
+        .dependencyCount = 1,
+        .pDependencies = &dependency
+    };
+
+    renderPass = vk::raii::RenderPass(device.getDevice(), renderPassInfo);
+}
+
+void VulkanSwapchain::createFramebuffers(const std::vector<vk::ImageView>& depthImageViews) {
+    framebuffers.clear();
+    framebuffers.reserve(imageViews.size());
+
+    for (size_t i = 0; i < imageViews.size(); i++) {
+        std::array attachments = {
+            *imageViews[i],
+            depthImageViews[i]  // One depth image view per swapchain image
+        };
+
+        vk::FramebufferCreateInfo framebufferInfo{
+            .renderPass = *renderPass,
+            .attachmentCount = static_cast<uint32_t>(attachments.size()),
+            .pAttachments = attachments.data(),
+            .width = extent.width,
+            .height = extent.height,
+            .layers = 1
+        };
+
+        framebuffers.emplace_back(device.getDevice(), framebufferInfo);
+    }
+}
+#endif

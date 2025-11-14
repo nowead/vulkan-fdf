@@ -35,6 +35,33 @@
         "environment": {
           "VCPKG_TARGET_TRIPLET": "x64-windows"
         }
+      },
+      {
+        "name": "linux-default",
+        "displayName": "Linux Default Config",
+        "description": "Default build for Linux using vcpkg with Clang 18",
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug",
+          "CMAKE_TOOLCHAIN_FILE": "$env{HOME}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+          "CMAKE_EXPORT_COMPILE_COMMANDS": "TRUE",
+          "CMAKE_C_COMPILER": "/usr/bin/clang-18",
+          "CMAKE_CXX_COMPILER": "/usr/bin/clang++-18",
+          "CMAKE_CXX_FLAGS": "-pthread",
+          "CMAKE_EXE_LINKER_FLAGS": "-lpthread",
+          "CMAKE_THREAD_LIBS_INIT": "-lpthread",
+          "CMAKE_HAVE_THREADS_LIBRARY": "1",
+          "CMAKE_USE_PTHREADS_INIT": "1",
+          "THREADS_PREFER_PTHREAD_FLAG": "ON",
+          "VULKAN_SDK": "$env{HOME}/1.3.296.0/x86_64"
+        },
+        "environment": {
+          "VCPKG_TARGET_TRIPLET": "x64-linux",
+          "VULKAN_SDK": "$env{HOME}/1.3.296.0/x86_64",
+          "PATH": "/home/damin/vcpkg/downloads/tools/ninja/1.13.1-linux:$penv{PATH}",
+          "LD_LIBRARY_PATH": "/usr/lib/x86_64-linux-gnu:$penv{LD_LIBRARY_PATH}"
+        }
       }
     ],
     "buildPresets": [
@@ -45,6 +72,10 @@
         {
             "name": "windows-default",
             "configurePreset": "windows-default"
+        },
+        {
+            "name": "linux-default",
+            "configurePreset": "linux-default"
         }
     ]
 }

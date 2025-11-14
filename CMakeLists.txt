@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.28)
 
 project(vulkanGLFW CXX)
 
@@ -121,15 +121,51 @@ function (add_slang_shader_target TARGET)
   )
 
   # 2. 실제 셰이더를 컴파일하는 커스텀 명령어 추가
-  add_custom_command (
-          OUTPUT  ${SHADERS_DIR}/slang.spv # 최종 결과물
-          # Slang 컴파일러 실행 명령어
-          COMMAND ${SLANGC_EXECUTABLE} ${SHADER_SOURCES} -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRY_POINTS} -o slang.spv
-          WORKING_DIRECTORY ${SHADERS_DIR} # 이 명령어를 실행할 디렉토리
-          DEPENDS ${SHADERS_DIR} ${SHADER_SOURCES} # 소스 파일이 변경되면 이 명령어를 다시 실행
-          COMMENT "Slang 셰이더 컴파일 중..."
-          VERBATIM
-  )
+  # VULKAN_SDK가 설정되어 있으면 라이브러리 경로를 포함
+  if(DEFINED ENV{VULKAN_SDK})
+    set(SLANG_LIB_PATH "$ENV{VULKAN_SDK}/lib")
+    if(UNIX AND NOT APPLE)
+      # Linux: LD_LIBRARY_PATH 설정, SPIR-V 1.3 for Vulkan 1.1 compatibility
+      add_custom_command (
+              OUTPUT  ${SHADERS_DIR}/slang.spv
+              COMMAND ${CMAKE_COMMAND} -E env "LD_LIBRARY_PATH=${SLANG_LIB_PATH}:$ENV{LD_LIBRARY_PATH}" ${SLANGC_EXECUTABLE} ${SHADER_SOURCES} -target spirv -profile spirv_1_3 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRY_POINTS} -o slang.spv
+              WORKING_DIRECTORY ${SHADERS_DIR}
+              DEPENDS ${SHADERS_DIR} ${SHADER_SOURCES}
+              COMMENT "Slang 셰이더 컴파일 중..."
+              VERBATIM
+      )
+    elseif(APPLE)
+      # macOS: DYLD_LIBRARY_PATH 설정
+      add_custom_command (
+              OUTPUT  ${SHADERS_DIR}/slang.spv
+              COMMAND ${CMAKE_COMMAND} -E env "DYLD_LIBRARY_PATH=${SLANG_LIB_PATH}:$ENV{DYLD_LIBRARY_PATH}" ${SLANGC_EXECUTABLE} ${SHADER_SOURCES} -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRY_POINTS} -o slang.spv
+              WORKING_DIRECTORY ${SHADERS_DIR}
+              DEPENDS ${SHADERS_DIR} ${SHADER_SOURCES}
+              COMMENT "Slang 셰이더 컴파일 중..."
+              VERBATIM
+      )
+    else()
+      # Windows 또는 기타: 환경 변수 없이 실행
+      add_custom_command (
+              OUTPUT  ${SHADERS_DIR}/slang.spv
+              COMMAND ${SLANGC_EXECUTABLE} ${SHADER_SOURCES} -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRY_POINTS} -o slang.spv
+              WORKING_DIRECTORY ${SHADERS_DIR}
+              DEPENDS ${SHADERS_DIR} ${SHADER_SOURCES}
+              COMMENT "Slang 셰이더 컴파일 중..."
+              VERBATIM
+      )
+    endif()
+  else()
+    # VULKAN_SDK가 설정되지 않은 경우
+    add_custom_command (
+            OUTPUT  ${SHADERS_DIR}/slang.spv
+            COMMAND ${SLANGC_EXECUTABLE} ${SHADER_SOURCES} -target spirv -profile spirv_1_4 -emit-spirv-directly -fvk-use-entrypoint-name ${ENTRY_POINTS} -o slang.spv
+            WORKING_DIRECTORY ${SHADERS_DIR}
+            DEPENDS ${SHADERS_DIR} ${SHADER_SOURCES}
+            COMMENT "Slang 셰이더 컴파일 중..."
+            VERBATIM
+    )
+  endif()
 
   # 3. 위 커스텀 명령어들을 실행하는 커스텀 타겟 생성
   add_custom_target (${TARGET} DEPENDS ${SHADERS_DIR}/slang.spv)

@@ -57,13 +57,7 @@ private:
 	// Configuration
 	bool enableValidationLayers;
 	std::vector<const char*> validationLayers;
-	std::vector<const char*> requiredDeviceExtensions = {
-		vk::KHRSwapchainExtensionName,
-		vk::KHRSpirv14ExtensionName,
-		vk::KHRSynchronization2ExtensionName,
-		vk::KHRCreateRenderpass2ExtensionName,
-		"VK_KHR_portability_subset"  // Mainly needed for macOS MoltenVK
-	};
+	std::vector<const char*> requiredDeviceExtensions;
 
 	// Initialization functions
 	void createInstance();

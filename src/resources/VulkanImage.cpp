@@ -104,6 +104,11 @@ void VulkanImage::createSampler(
     vk::SamplerAddressMode addressMode) {
 
     vk::PhysicalDeviceProperties properties = device.getPhysicalDevice().getProperties();
+    vk::PhysicalDeviceFeatures features = device.getPhysicalDevice().getFeatures();
+
+    // Only enable anisotropy if the device supports it
+    bool enableAnisotropy = features.samplerAnisotropy;
+
     vk::SamplerCreateInfo samplerInfo{
         .magFilter = magFilter,
         .minFilter = minFilter,
@@ -112,8 +117,8 @@ void VulkanImage::createSampler(
         .addressModeV = addressMode,
         .addressModeW = addressMode,
         .mipLodBias = 0.0f,
-        .anisotropyEnable = vk::True,
-        .maxAnisotropy = properties.limits.maxSamplerAnisotropy,
+        .anisotropyEnable = enableAnisotropy ? vk::True : vk::False,
+        .maxAnisotropy = enableAnisotropy ? properties.limits.maxSamplerAnisotropy : 1.0f,
         .compareEnable = vk::False,
         .compareOp = vk::CompareOp::eAlways,
         .minLod = 0.0f,

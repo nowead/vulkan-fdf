@@ -46,6 +46,18 @@ public:
     vk::Extent2D getExtent() const { return extent; }
     uint32_t getImageCount() const { return static_cast<uint32_t>(images.size()); }
 
+#ifdef __linux__
+    // Traditional render pass support for Vulkan 1.1 (Linux only)
+    vk::RenderPass getRenderPass() const { return *renderPass; }
+    vk::Framebuffer getFramebuffer(uint32_t index) const { return *framebuffers[index]; }
+    bool usesDynamicRendering() const { return false; }
+    void createRenderPass(vk::Format depthFormat);
+    void createFramebuffers(const std::vector<vk::ImageView>& attachments);
+#else
+    // Dynamic rendering support for Vulkan 1.3 (macOS/Windows)
+    bool usesDynamicRendering() const { return true; }
+#endif
+
 private:
     VulkanDevice& device;
     GLFWwindow* window;
@@ -55,6 +67,12 @@ private:
     std::vector<vk::raii::ImageView> imageViews;
     vk::SurfaceFormatKHR surfaceFormat;
     vk::Extent2D extent;
+
+#ifdef __linux__
+    // Traditional render pass resources (Vulkan 1.1)
+    vk::raii::RenderPass renderPass = nullptr;
+    std::vector<vk::raii::Framebuffer> framebuffers;
+#endif
 
     void createSwapchain();
     void createImageViews();
