@@ -1,4 +1,5 @@
 #include "VulkanPipeline.hpp"
+#include "../core/PlatformConfig.hpp"
 #include "../utils/Vertex.hpp"
 #include "../utils/FileUtils.hpp"
 
@@ -147,33 +148,9 @@ void VulkanPipeline::createGraphicsPipeline(
     };
 
     // Platform-specific pipeline creation
-#ifdef __linux__
-    // Linux: Use traditional render pass (Vulkan 1.1)
-    vk::GraphicsPipelineCreateInfo pipelineInfo{
-        .stageCount = 2,
-        .pStages = shaderStages,
-        .pVertexInputState = &vertexInputInfo,
-        .pInputAssemblyState = &inputAssembly,
-        .pViewportState = &viewportState,
-        .pRasterizationState = &rasterizer,
-        .pMultisampleState = &multisampling,
-        .pDepthStencilState = &depthStencil,
-        .pColorBlendState = &colorBlending,
-        .pDynamicState = &dynamicState,
-        .layout = *pipelineLayout,
-        .renderPass = renderPass,
-        .subpass = 0
-    };
-
-    graphicsPipeline = vk::raii::Pipeline(
-        device.getDevice(),
-        nullptr,
-        pipelineInfo
-    );
-#else
-    // macOS/Windows: Use dynamic rendering (Vulkan 1.3)
-    vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipelineCreateInfoChain = {
-        {
+    if constexpr (!Platform::USE_DYNAMIC_RENDERING) {
+        // Linux: Use traditional render pass (Vulkan 1.1)
+        vk::GraphicsPipelineCreateInfo pipelineInfo{
             .stageCount = 2,
             .pStages = shaderStages,
             .pVertexInputState = &vertexInputInfo,
@@ -185,21 +162,45 @@ void VulkanPipeline::createGraphicsPipeline(
             .pColorBlendState = &colorBlending,
             .pDynamicState = &dynamicState,
             .layout = *pipelineLayout,
-            .renderPass = nullptr
-        },
-        {
-            .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &colorFormat,
-            .depthAttachmentFormat = depthFormat
-        }
-    };
+            .renderPass = renderPass,
+            .subpass = 0
+        };
 
-    graphicsPipeline = vk::raii::Pipeline(
-        device.getDevice(),
-        nullptr,
-        pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>()
-    );
-#endif
+        graphicsPipeline = vk::raii::Pipeline(
+            device.getDevice(),
+            nullptr,
+            pipelineInfo
+        );
+    } else {
+        // macOS/Windows: Use dynamic rendering (Vulkan 1.3)
+        vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipelineCreateInfoChain = {
+            {
+                .stageCount = 2,
+                .pStages = shaderStages,
+                .pVertexInputState = &vertexInputInfo,
+                .pInputAssemblyState = &inputAssembly,
+                .pViewportState = &viewportState,
+                .pRasterizationState = &rasterizer,
+                .pMultisampleState = &multisampling,
+                .pDepthStencilState = &depthStencil,
+                .pColorBlendState = &colorBlending,
+                .pDynamicState = &dynamicState,
+                .layout = *pipelineLayout,
+                .renderPass = nullptr
+            },
+            {
+                .colorAttachmentCount = 1,
+                .pColorAttachmentFormats = &colorFormat,
+                .depthAttachmentFormat = depthFormat
+            }
+        };
+
+        graphicsPipeline = vk::raii::Pipeline(
+            device.getDevice(),
+            nullptr,
+            pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>()
+        );
+    }
 }
 
 vk::raii::ShaderModule VulkanPipeline::createShaderModule(const std::vector<char>& code) {

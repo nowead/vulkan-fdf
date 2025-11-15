@@ -2,6 +2,7 @@
 
 #include "../utils/VulkanCommon.hpp"
 #include "../core/VulkanDevice.hpp"
+#include "../core/PlatformConfig.hpp"
 #include <vector>
 
 /**
@@ -46,16 +47,15 @@ public:
     vk::Extent2D getExtent() const { return extent; }
     uint32_t getImageCount() const { return static_cast<uint32_t>(images.size()); }
 
+    // Platform-specific rendering support
+    bool usesDynamicRendering() const { return Platform::USE_DYNAMIC_RENDERING; }
+
 #ifdef __linux__
     // Traditional render pass support for Vulkan 1.1 (Linux only)
     vk::RenderPass getRenderPass() const { return *renderPass; }
     vk::Framebuffer getFramebuffer(uint32_t index) const { return *framebuffers[index]; }
-    bool usesDynamicRendering() const { return false; }
     void createRenderPass(vk::Format depthFormat);
     void createFramebuffers(const std::vector<vk::ImageView>& attachments);
-#else
-    // Dynamic rendering support for Vulkan 1.3 (macOS/Windows)
-    bool usesDynamicRendering() const { return true; }
 #endif
 
 private:

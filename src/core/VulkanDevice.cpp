@@ -1,4 +1,5 @@
 #include "VulkanDevice.hpp"
+#include "PlatformConfig.hpp"
 #include <iostream>
 #include <cstring>
 #include <algorithm>
@@ -10,32 +11,8 @@
 VulkanDevice::VulkanDevice(const std::vector<const char*>& validationLayers, bool enableValidation)
 	: enableValidationLayers(enableValidation)
 	, validationLayers(validationLayers)
+	, requiredDeviceExtensions(Platform::getRequiredDeviceExtensions())
 {
-	// Set required device extensions based on platform
-#ifdef __linux__
-	// Linux: Minimal requirements for WSL/llvmpipe compatibility
-	requiredDeviceExtensions = {
-		vk::KHRSwapchainExtensionName
-	};
-#elif defined(__APPLE__)
-	// macOS: Full Vulkan 1.3 requirements + MoltenVK portability
-	requiredDeviceExtensions = {
-		vk::KHRSwapchainExtensionName,
-		vk::KHRSpirv14ExtensionName,
-		vk::KHRSynchronization2ExtensionName,
-		vk::KHRCreateRenderpass2ExtensionName,
-		"VK_KHR_portability_subset"
-	};
-#else
-	// Windows: Full Vulkan 1.3 requirements
-	requiredDeviceExtensions = {
-		vk::KHRSwapchainExtensionName,
-		vk::KHRSpirv14ExtensionName,
-		vk::KHRSynchronization2ExtensionName,
-		vk::KHRCreateRenderpass2ExtensionName
-	};
-#endif
-
 	createInstance();
 	setupDebugMessenger();
 	pickPhysicalDevice();
@@ -115,7 +92,7 @@ void VulkanDevice::setupDebugMessenger() {
 	vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT{
 		.messageSeverity = severityFlags,
 		.messageType = messageTypeFlags,
-		.pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(&debugCallback)
+		.pfnUserCallback = &debugCallback
 	};
 	debugMessenger = instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
 }
@@ -150,26 +127,7 @@ void VulkanDevice::pickPhysicalDevice() {
 			);
 
 			// Check required features
-			auto features = device.template getFeatures2<
-				vk::PhysicalDeviceFeatures2,
-				vk::PhysicalDeviceVulkan11Features,
-				vk::PhysicalDeviceVulkan13Features,
-				vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
-			>();
-
-#ifdef __linux__
-			// Linux: Relaxed requirements for WSL/llvmpipe compatibility
-			// No required features - accept any device
-			bool supportsRequiredFeatures = true;  // Accept all devices on Linux
-#else
-			// macOS/Windows: Full Vulkan 1.3 feature requirements
-			bool supportsRequiredFeatures =
-				features.template get<vk::PhysicalDeviceVulkan11Features>().shaderDrawParameters &&
-				features.template get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy &&
-				features.template get<vk::PhysicalDeviceVulkan13Features>().synchronization2 &&
-				features.template get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering &&
-				features.template get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState;
-#endif
+			bool supportsRequiredFeatures = Platform::checkDeviceFeatureSupport(device);
 
 			return supportsVulkan1_1 && supportsGraphics && supportsAllRequiredExtensions && supportsRequiredFeatures;
 		}
@@ -198,59 +156,51 @@ void VulkanDevice::createLogicalDevice() {
 		throw std::runtime_error("Could not find a queue for graphics and present -> terminating");
 	}
 
-	// Build feature chain based on platform requirements
-#ifdef __linux__
-	// Linux: Use minimal Vulkan 1.0 features for llvmpipe compatibility
-	// Query what features are available
-	auto availableFeatures = physicalDevice.getFeatures();
-
-	vk::PhysicalDeviceFeatures2 featureChain = {
-		.features = availableFeatures  // Enable all available features
-	};
-#else
-	// macOS/Windows: Enable full Vulkan 1.3 features
-	vk::StructureChain<
-		vk::PhysicalDeviceFeatures2,
-		vk::PhysicalDeviceVulkan11Features,
-		vk::PhysicalDeviceVulkan13Features,
-		vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
-	> featureChain = {
-		{.features = {.samplerAnisotropy = true }},             // vk::PhysicalDeviceFeatures2
-		{.shaderDrawParameters = true },                        // vk::PhysicalDeviceVulkan11Features
-		{.synchronization2 = true, .dynamicRendering = true },  // vk::PhysicalDeviceVulkan13Features
-		{.extendedDynamicState = true }                         // vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
-	};
-#endif
-
-	// Create a Device
 	float queuePriority = 0.0f;
-	vk::DeviceQueueCreateInfo deviceQueueCreateInfo{
-		.queueFamilyIndex = graphicsQueueFamily,
-		.queueCount = 1,
-		.pQueuePriorities = &queuePriority
-	};
+	vk::DeviceQueueCreateInfo deviceQueueCreateInfo = Platform::createDeviceQueueCreateInfo(graphicsQueueFamily, &queuePriority);
 
-#ifdef __linux__
-	// Linux: Use simple feature chain
-	vk::DeviceCreateInfo deviceCreateInfo{
-		.pNext = &featureChain,
-		.queueCreateInfoCount = 1,
-		.pQueueCreateInfos = &deviceQueueCreateInfo,
-		.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size()),
-		.ppEnabledExtensionNames = requiredDeviceExtensions.data()
-	};
-#else
-	// macOS/Windows: Use full feature chain
-	vk::DeviceCreateInfo deviceCreateInfo{
-		.pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
-		.queueCreateInfoCount = 1,
-		.pQueueCreateInfos = &deviceQueueCreateInfo,
-		.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size()),
-		.ppEnabledExtensionNames = requiredDeviceExtensions.data()
-	};
-#endif
+	// Build feature chain based on platform requirements
+	if constexpr (!Platform::USE_VULKAN_1_3_FEATURES) {
+		// Linux: Use minimal Vulkan 1.0 features for llvmpipe compatibility
+		auto availableFeatures = physicalDevice.getFeatures();
 
-	device = vk::raii::Device(physicalDevice, deviceCreateInfo);
+		vk::PhysicalDeviceFeatures2 featureChain = {
+			.features = availableFeatures  // Enable all available features
+		};
+
+		vk::DeviceCreateInfo deviceCreateInfo{
+			.pNext = &featureChain,
+			.queueCreateInfoCount = 1,
+			.pQueueCreateInfos = &deviceQueueCreateInfo,
+			.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size()),
+			.ppEnabledExtensionNames = requiredDeviceExtensions.data()
+		};
+
+		device = vk::raii::Device(physicalDevice, deviceCreateInfo);
+	} else {
+		// macOS/Windows: Enable full Vulkan 1.3 features
+		vk::StructureChain<
+			vk::PhysicalDeviceFeatures2,
+			vk::PhysicalDeviceVulkan11Features,
+			vk::PhysicalDeviceVulkan13Features,
+			vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
+		> featureChain = {
+			{.features = {.samplerAnisotropy = true }},             // vk::PhysicalDeviceFeatures2
+			{.shaderDrawParameters = true },                        // vk::PhysicalDeviceVulkan11Features
+			{.synchronization2 = true, .dynamicRendering = true },  // vk::PhysicalDeviceVulkan13Features
+			{.extendedDynamicState = true }                         // vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT
+		};
+
+		vk::DeviceCreateInfo deviceCreateInfo{
+			.pNext = &featureChain.get<vk::PhysicalDeviceFeatures2>(),
+			.queueCreateInfoCount = 1,
+			.pQueueCreateInfos = &deviceQueueCreateInfo,
+			.enabledExtensionCount = static_cast<uint32_t>(requiredDeviceExtensions.size()),
+			.ppEnabledExtensionNames = requiredDeviceExtensions.data()
+		};
+
+		device = vk::raii::Device(physicalDevice, deviceCreateInfo);
+	}
 	graphicsQueue = vk::raii::Queue(device, graphicsQueueFamily, 0);
 }
 

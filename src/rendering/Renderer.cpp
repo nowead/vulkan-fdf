@@ -22,6 +22,7 @@ Renderer::Renderer(GLFWwindow* window,
     // Create depth resources
     createDepthResources();
 
+    // Platform-specific pipeline creation
 #ifdef __linux__
     // Linux: Create render pass and framebuffers for traditional rendering
     swapchain->createRenderPass(findDepthFormat());
