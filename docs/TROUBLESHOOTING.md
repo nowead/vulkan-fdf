@@ -1,0 +1,498 @@
+# Troubleshooting Guide
+
+Common issues and solutions when building or running Mini-Engine.
+
+---
+
+## Table of Contents
+
+- [Build Issues](#build-issues)
+- [Runtime Issues](#runtime-issues)
+- [Shader Compilation](#shader-compilation)
+- [Platform-Specific Issues](#platform-specific-issues)
+- [Performance Issues](#performance-issues)
+- [Debugging Tools](#debugging-tools)
+
+---
+
+## Build Issues
+
+### CMake Configuration Fails
+
+**Error:**
+```
+CMake Error: Could not find VCPKG_ROOT
+```
+
+**Solution:**
+```bash
+# Set VCPKG_ROOT environment variable
+export VCPKG_ROOT=/path/to/vcpkg  # Linux/macOS
+# or
+set VCPKG_ROOT=C:\vcpkg  # Windows
+
+# Verify it's set
+echo $VCPKG_ROOT  # Linux/macOS
+echo %VCPKG_ROOT%  # Windows
+```
+
+---
+
+### Library Not Found
+
+**Error:**
+```
+CMake Error: Could not find glfw3, glm, stb, or tinyobjloader
+```
+
+**Solution:**
+
+1. **Install dependencies via vcpkg:**
+   ```bash
+   $VCPKG_ROOT/vcpkg install glfw3 glm stb tinyobjloader
+   ```
+
+2. **Verify installation:**
+   ```bash
+   $VCPKG_ROOT/vcpkg list
+   # Should show: glfw3, glm, stb, tinyobjloader
+   ```
+
+3. **Reconfigure CMake:**
+   ```bash
+   rm -rf build  # Clean previous build
+   cmake --preset=default
+   ```
+
+---
+
+### C++20 Compiler Not Found
+
+**Error:**
+```
+CMake Error: C++ compiler does not support C++20
+```
+
+**Solution:**
+
+**Linux:**
+```bash
+# Install newer GCC or Clang
+sudo apt install g++-11  # Ubuntu/Debian
+# or
+sudo dnf install gcc-c++  # Fedora/RHEL
+
+# Set as default compiler
+export CXX=g++-11
+```
+
+**macOS:**
+```bash
+# Update Xcode Command Line Tools
+xcode-select --install
+
+# Verify Clang version (should be 14+)
+clang++ --version
+```
+
+**Windows:**
+- Install Visual Studio 2022 (includes C++20 support)
+- Or update existing installation via Visual Studio Installer
+
+---
+
+## Runtime Issues
+
+### Vulkan Device Not Found
+
+**Error:**
+```
+Failed to find GPUs with Vulkan support
+```
+
+**Possible Causes:**
+1. Graphics drivers not updated
+2. Vulkan drivers not installed
+3. Running in virtual machine without GPU passthrough
+
+**Solutions:**
+
+**1. Update Graphics Drivers:**
+
+- **NVIDIA**: Download latest drivers from [nvidia.com](https://www.nvidia.com/Download/index.aspx)
+- **AMD**: Download from [amd.com](https://www.amd.com/en/support)
+- **Intel**: Download from [intel.com](https://www.intel.com/content/www/us/en/download-center/home.html)
+
+**2. Verify Vulkan Support:**
+```bash
+vulkaninfo  # Should display GPU capabilities
+```
+
+**3. Linux-Specific: Install Vulkan Drivers**
+
+**Ubuntu/Debian:**
+```bash
+# For Intel/AMD
+sudo apt install mesa-vulkan-drivers
+
+# For NVIDIA (proprietary)
+sudo ubuntu-drivers autoinstall
+```
+
+**Arch Linux:**
+```bash
+# For Intel
+sudo pacman -S vulkan-intel
+
+# For AMD
+sudo pacman -S vulkan-radeon
+
+# For NVIDIA
+sudo pacman -S nvidia vulkan-nvidia
+```
+
+**4. Virtual Machine Users:**
+- Vulkan requires GPU access
+- Enable GPU passthrough if possible
+- Or run on host system instead
+
+---
+
+### Application Crashes on Startup
+
+**Error:**
+```
+Segmentation fault (core dumped)
+```
+
+**Solution:**
+
+1. **Enable Vulkan Validation Layers** for detailed error messages:
+
+   Edit `src/Application.cpp`:
+   ```cpp
+   static constexpr bool ENABLE_VALIDATION = true;
+   ```
+
+   Rebuild and run:
+   ```bash
+   make build && make run
+   ```
+
+2. **Check Validation Layer Output:**
+   - Look for `VUID-` error codes in output
+   - Search for the code at [Vulkan Spec](https://registry.khronos.org/vulkan/)
+
+3. **Common Causes:**
+   - Missing shader files (`shaders/slang.spv` not found)
+   - Missing model/texture files
+   - Incompatible Vulkan version
+
+---
+
+### Validation Layer Errors
+
+**Error:**
+```
+Validation Error: [VUID-xxxxx] ...
+```
+
+**Solution:**
+
+1. **Read the error message carefully** - it usually indicates the exact problem
+
+2. **Common Validation Errors:**
+
+   **Missing Memory Barrier:**
+   ```
+   VUID-vkCmdDraw-None-02859: Image layout mismatch
+   ```
+   - Fix: Add proper pipeline barriers for image layout transitions
+
+   **Buffer/Image Not Bound:**
+   ```
+   VUID-vkCmdDraw-None-02697: Descriptor set not bound
+   ```
+   - Fix: Ensure `vkCmdBindDescriptorSets` is called before draw
+
+   **Synchronization Error:**
+   ```
+   VUID-vkQueueSubmit-pWaitSemaphores-xxxxx
+   ```
+   - Fix: Check semaphore and fence usage in `SyncManager`
+
+3. **Disable Validation for Release Builds:**
+
+   Edit `src/Application.cpp`:
+   ```cpp
+   static constexpr bool ENABLE_VALIDATION = false;
+   ```
+
+---
+
+## Shader Compilation
+
+### Shader Compilation Fails
+
+**Error:**
+```
+slangc: command not found
+```
+
+**Solution:**
+
+1. **Verify Vulkan SDK Installation:**
+   ```bash
+   echo $VULKAN_SDK  # Should point to Vulkan SDK directory
+   ```
+
+2. **Check if slangc exists:**
+   ```bash
+   ls $VULKAN_SDK/bin/slangc  # Should exist
+   ```
+
+3. **Add to PATH:**
+
+   **Linux/macOS** (`~/.bashrc` or `~/.zshrc`):
+   ```bash
+   export PATH=$VULKAN_SDK/bin:$PATH
+   ```
+
+   **Windows** (PowerShell as Administrator):
+   ```powershell
+   [Environment]::SetEnvironmentVariable(
+       "Path",
+       "$env:Path;$env:VULKAN_SDK\bin",
+       "User"
+   )
+   ```
+
+4. **Verify slangc works:**
+   ```bash
+   slangc --version
+   ```
+
+---
+
+### SPIR-V Compilation Error
+
+**Error:**
+```
+Error compiling shader.slang: unknown type 'XXX'
+```
+
+**Solution:**
+
+1. **Check Slang syntax** in `shaders/shader.slang`
+2. **Common issues:**
+   - Incorrect uniform buffer layout
+   - Missing `[[vk::binding(N)]]` annotations
+   - Incompatible SPIR-V version for platform
+
+3. **Platform-Specific SPIR-V Versions:**
+   - Linux: SPIR-V 1.3 (Vulkan 1.1 compatibility)
+   - macOS/Windows: SPIR-V 1.4 (Vulkan 1.3)
+
+---
+
+## Platform-Specific Issues
+
+### macOS: MoltenVK Errors
+
+**Error:**
+```
+MoltenVK does not support feature: XXX
+```
+
+**Solution:**
+
+1. **Check feature compatibility** at [MoltenVK Features](https://github.com/KhronosGroup/MoltenVK#moltenvk-feature-support)
+
+2. **Common Unsupported Features:**
+   - Some Vulkan 1.3 features
+   - Certain descriptor indexing features
+   - Ray tracing (not supported on Metal)
+
+3. **Workaround:**
+   - Use Vulkan 1.1 compatible features only
+   - Conditional compilation for macOS-specific code
+
+---
+
+### Linux: llvmpipe (Software Rendering)
+
+**Warning:**
+```
+WARNING: lavapipe is not a conformant Vulkan implementation
+```
+
+**Context:**
+- `llvmpipe` is a software Vulkan renderer (CPU-based)
+- Used when no GPU drivers available
+- Performance will be significantly slower
+
+**Solution (if you have a GPU):**
+
+1. **Install proper drivers** (see [Vulkan Device Not Found](#vulkan-device-not-found))
+
+2. **Force discrete GPU (laptops with hybrid graphics):**
+   ```bash
+   DRI_PRIME=1 ./build/vulkanGLFW
+   ```
+
+3. **Verify GPU is being used:**
+   ```bash
+   vulkaninfo | grep deviceName
+   # Should show your actual GPU, not llvmpipe
+   ```
+
+---
+
+### Windows: Missing DLL
+
+**Error:**
+```
+The code execution cannot proceed because VCRUNTIME140.dll was not found
+```
+
+**Solution:**
+
+1. **Install Visual C++ Redistributable:**
+   - Download from [Microsoft](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+   - Install both x64 and x86 versions
+
+2. **Or install Visual Studio 2022** (includes redistributables)
+
+---
+
+## Performance Issues
+
+### Low Frame Rate
+
+**Symptoms:**
+- Application runs but FPS < 30
+- Stuttering or lag
+
+**Diagnostics:**
+
+1. **Enable Performance Monitoring:**
+
+   Add FPS counter to `Application.cpp` main loop:
+   ```cpp
+   // Print FPS every second
+   static auto lastTime = std::chrono::high_resolution_clock::now();
+   static int frameCount = 0;
+   frameCount++;
+
+   auto now = std::chrono::high_resolution_clock::now();
+   auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime);
+   if (delta.count() >= 1000) {
+       std::cout << "FPS: " << frameCount << std::endl;
+       frameCount = 0;
+       lastTime = now;
+   }
+   ```
+
+2. **Check if running on integrated GPU:**
+   ```bash
+   vulkaninfo | grep deviceName
+   ```
+
+3. **Optimize:**
+   - Ensure Release build: `cmake --build build --config Release`
+   - Disable validation layers (see above)
+   - Check for excessive draw calls
+
+---
+
+### Memory Leaks
+
+**Symptoms:**
+- Memory usage increases over time
+- Application crashes after running for a while
+
+**Diagnostics:**
+
+1. **Enable Vulkan validation layers** (catches many resource leaks)
+
+2. **Use memory profilers:**
+   - **Linux**: `valgrind --leak-check=full ./build/vulkanGLFW`
+   - **macOS**: Instruments (Xcode → Open Developer Tool → Instruments)
+   - **Windows**: Visual Studio Diagnostic Tools
+
+3. **Common Causes:**
+   - Forgot to destroy Vulkan objects
+   - RAII destructors not called (check move semantics)
+   - Circular references with smart pointers
+
+---
+
+## Debugging Tools
+
+### RenderDoc (Frame Capture)
+
+**Install:**
+- Download from [renderdoc.org](https://renderdoc.org/)
+
+**Usage:**
+1. Launch RenderDoc
+2. Set executable: `build/vulkanGLFW`
+3. Click "Launch"
+4. Press F12 in running app to capture frame
+5. Analyze draw calls, pipeline state, buffers, textures
+
+---
+
+### NVIDIA Nsight Graphics
+
+**Install:**
+- Download from [NVIDIA Developer](https://developer.nvidia.com/nsight-graphics)
+
+**Usage:**
+- Launch Nsight
+- Attach to `vulkanGLFW` process
+- Profile GPU performance, shader execution
+
+---
+
+### Vulkan Validation Layers
+
+**Enable:**
+```cpp
+// src/Application.cpp
+static constexpr bool ENABLE_VALIDATION = true;
+```
+
+**Output:**
+- Detailed error messages with `VUID-` codes
+- Performance warnings
+- Best practices suggestions
+
+**Search VUID codes:**
+- [Vulkan Specification](https://registry.khronos.org/vulkan/)
+- [Vulkan Validation Layers Guide](https://github.com/KhronosGroup/Vulkan-ValidationLayers)
+
+---
+
+## Getting More Help
+
+If none of these solutions work:
+
+1. **Check Documentation:**
+   - [Build Guide](BUILD_GUIDE.md)
+   - [Cross-Platform Guide](CROSS_PLATFORM_RENDERING.md)
+   - [Refactoring Docs](refactoring/)
+
+2. **Open an Issue:**
+   - Include OS, GPU, Vulkan SDK version
+   - Attach full error message
+   - Describe steps to reproduce
+
+3. **Useful Resources:**
+   - [Vulkan Tutorial](https://vulkan-tutorial.com/)
+   - [Vulkan Spec](https://registry.khronos.org/vulkan/)
+   - [Khronos Forums](https://community.khronos.org/)
+
+---
+
+*Last Updated: 2025-11-17*
