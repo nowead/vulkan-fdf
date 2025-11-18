@@ -244,15 +244,14 @@ vk::Format VulkanDevice::findSupportedFormat(
 	return *formatIt;
 }
 
-VKAPI_ATTR vk::Bool32 VKAPI_CALL VulkanDevice::debugCallback(
-	vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
-	vk::DebugUtilsMessageTypeFlagsEXT type,
-	const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDevice::debugCallback(
+	VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+	VkDebugUtilsMessageTypeFlagsEXT type,
+	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 	void*)
 {
-	if (severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eError ||
-		severity == vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
-		std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << std::endl;
+	if (severity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
+		std::cerr << "validation layer: type 0x" << std::hex << type << std::dec << " msg: " << pCallbackData->pMessage << std::endl;
 	}
-	return vk::False;
+	return VK_FALSE;
 }
