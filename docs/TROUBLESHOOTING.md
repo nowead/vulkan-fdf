@@ -101,6 +101,65 @@ clang++ --version
 
 ---
 
+### Debug Callback Type Mismatch (Cross-Platform)
+
+**Error:**
+```
+error: cannot initialize a member subobject of type 'PFN_DebugUtilsMessengerCallbackEXT'
+with an rvalue of type 'VkBool32 (*)(VkDebugUtilsMessageSeverityFlagBitsEXT, ...)'
+type mismatch at 1st parameter ('DebugUtilsMessageSeverityFlagBitsEXT' vs 'VkDebugUtilsMessageSeverityFlagBitsEXT')
+```
+
+**Cause:**
+- Vulkan-Hpp on macOS expects C++ wrapper types (`vk::`)
+- Linux with llvmpipe requires C API types (`Vk`)
+
+**Solution:**
+
+Use platform-specific conditional compilation:
+
+**VulkanDevice.hpp:**
+```cpp
+#ifdef __linux__
+    // Linux: Use C API types
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+        VkDebugUtilsMessageTypeFlagsEXT type,
+        const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void* pUserData);
+#else
+    // macOS/Windows: Use C++ Vulkan-Hpp types
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+        vk::DebugUtilsMessageTypeFlagsEXT type,
+        const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+        void* pUserData);
+#endif
+```
+
+**VulkanDevice.cpp:**
+```cpp
+#ifdef __linux__
+VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDevice::debugCallback(...) {
+    if (severity & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
+        std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+    }
+    return VK_FALSE;
+}
+#else
+VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDevice::debugCallback(...) {
+    if (static_cast<uint32_t>(severity) & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
+        std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+    }
+    return VK_FALSE;
+}
+#endif
+```
+
+---
+
 ## Runtime Issues
 
 ### Vulkan Device Not Found
@@ -296,6 +355,71 @@ Error compiling shader.slang: unknown type 'XXX'
 ---
 
 ## Platform-Specific Issues
+
+### macOS: Validation Layer Not Found
+
+**Error:**
+```
+Required layer not supported: VK_LAYER_KHRONOS_validation
+Context::createInstance: ErrorLayerNotPresent
+```
+
+**Cause:**
+- Vulkan SDK installed via Homebrew uses different paths than standalone SDK
+- macOS SIP (System Integrity Protection) blocks `DYLD_LIBRARY_PATH`
+
+**Solution:**
+
+1. **Update Makefile environment setup** to use Homebrew paths:
+   ```makefile
+   HOMEBREW_PREFIX := $(shell brew --prefix)
+   VULKAN_LAYER_PATH := $(HOMEBREW_PREFIX)/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d
+   ```
+
+2. **Use `DYLD_FALLBACK_LIBRARY_PATH` instead of `DYLD_LIBRARY_PATH`** (SIP allows this):
+   ```makefile
+   export VK_LAYER_PATH="$(VULKAN_LAYER_PATH)"
+   export DYLD_FALLBACK_LIBRARY_PATH="$(HOMEBREW_PREFIX)/opt/vulkan-validationlayers/lib:$(HOMEBREW_PREFIX)/lib:/usr/local/lib:/usr/lib"
+   ```
+
+3. **Verify layer detection:**
+   ```bash
+   export VK_LAYER_PATH="/opt/homebrew/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d"
+   vulkaninfo --summary | grep -A5 "Instance Layers"
+   # Should show: VK_LAYER_KHRONOS_validation
+   ```
+
+**Key Points:**
+- `VK_LAYER_PATH`: Points to `.json` manifest files
+- `DYLD_FALLBACK_LIBRARY_PATH`: Points to `.dylib` library files
+- Never use `DYLD_LIBRARY_PATH` on macOS (SIP blocks it)
+
+---
+
+### macOS: Window Surface Creation Fails
+
+**Error:**
+```
+failed to create window surface!
+```
+
+**Cause:**
+- Setting `VULKAN_SDK` environment variable incorrectly can interfere with MoltenVK
+- Incorrect `DYLD_LIBRARY_PATH` settings
+
+**Solution:**
+
+Only set minimal required environment variables:
+```bash
+export VK_LAYER_PATH="/opt/homebrew/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d"
+export DYLD_FALLBACK_LIBRARY_PATH="/opt/homebrew/opt/vulkan-validationlayers/lib:/opt/homebrew/lib:/usr/local/lib:/usr/lib"
+```
+
+Do NOT set:
+- ❌ `VULKAN_SDK` (unless specifically needed)
+- ❌ `DYLD_LIBRARY_PATH` (use `DYLD_FALLBACK_LIBRARY_PATH`)
+
+---
 
 ### macOS: MoltenVK Errors
 
@@ -495,4 +619,4 @@ If none of these solutions work:
 
 ---
 
-*Last Updated: 2025-11-17*
+*Last Updated: 2025-11-21*

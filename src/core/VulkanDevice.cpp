@@ -244,6 +244,8 @@ vk::Format VulkanDevice::findSupportedFormat(
 	return *formatIt;
 }
 
+#ifdef __linux__
+// Linux: Use C API types for compatibility with llvmpipe
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDevice::debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT severity,
 	VkDebugUtilsMessageTypeFlagsEXT type,
@@ -255,3 +257,17 @@ VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDevice::debugCallback(
 	}
 	return VK_FALSE;
 }
+#else
+// macOS/Windows: Use C++ Vulkan-Hpp types
+VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDevice::debugCallback(
+	vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+	vk::DebugUtilsMessageTypeFlagsEXT type,
+	const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+	void*)
+{
+	if (static_cast<uint32_t>(severity) & (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)) {
+		std::cerr << "validation layer: type 0x" << std::hex << static_cast<uint32_t>(type) << std::dec << " msg: " << pCallbackData->pMessage << std::endl;
+	}
+	return VK_FALSE;
+}
+#endif

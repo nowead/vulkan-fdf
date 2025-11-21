@@ -22,9 +22,10 @@ ifeq ($(DETECTED_OS),Linux)
     VULKAN_LAYER_PATH := $(VULKAN_SDK)/share/vulkan/explicit_layer.d
 else ifeq ($(DETECTED_OS),macOS)
     CMAKE_PRESET := mac-default
-    VULKAN_SDK := $(HOME)/VulkanSDK/1.3.296.0/macOS
+    HOMEBREW_PREFIX := $(shell brew --prefix)
+    VULKAN_SDK := $(HOMEBREW_PREFIX)/opt/vulkan-loader
     EXPORT_LIB_PATH := export DYLD_LIBRARY_PATH=$(VULKAN_SDK)/lib:$$DYLD_LIBRARY_PATH
-    VULKAN_LAYER_PATH := $(VULKAN_SDK)/share/vulkan/explicit_layer.d
+    VULKAN_LAYER_PATH := $(HOMEBREW_PREFIX)/opt/vulkan-validationlayers/share/vulkan/explicit_layer.d
 else ifeq ($(DETECTED_OS),Windows)
     CMAKE_PRESET := windows-default
     VULKAN_SDK := C:/VulkanSDK/1.3.296.0
@@ -43,7 +44,7 @@ EXPORT_VK_LAYER := export VK_LAYER_PATH="$(VULKAN_LAYER_PATH)"
 ifeq ($(DETECTED_OS),Linux)
     ENV_SETUP := $(EXPORT_VULKAN_SDK) && $(EXPORT_PATH) && export LD_LIBRARY_PATH="$(VULKAN_SDK)/lib:$$LD_LIBRARY_PATH" && $(EXPORT_VK_LAYER)
 else ifeq ($(DETECTED_OS),macOS)
-    ENV_SETUP := $(EXPORT_VULKAN_SDK) && $(EXPORT_PATH) && export DYLD_LIBRARY_PATH="$(VULKAN_SDK)/lib:$$DYLD_LIBRARY_PATH" && $(EXPORT_VK_LAYER)
+    ENV_SETUP := export VK_LAYER_PATH="$(VULKAN_LAYER_PATH)" && export DYLD_FALLBACK_LIBRARY_PATH="$(HOMEBREW_PREFIX)/opt/vulkan-validationlayers/lib:$(HOMEBREW_PREFIX)/lib:/usr/local/lib:/usr/lib"
 else
     ENV_SETUP := $(EXPORT_VULKAN_SDK) && $(EXPORT_PATH) && $(EXPORT_VK_LAYER)
 endif
