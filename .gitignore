@@ -28,3 +28,6 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 !CMakeLists.txt
+
+#slang
+slang.spv
