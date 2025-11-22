@@ -31,3 +31,6 @@ cmake_install.cmake
 
 #slang
 slang.spv
+
+#docs/blog
+docs/blog
